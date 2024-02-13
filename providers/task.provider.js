@@ -1,11 +1,18 @@
 const { Task } = require("../models");
 
 const taskProvider = {
+  async getAll() {
+    return Task.findAll();
+  },
   async createTask(task) {
     return Task.create(task);
   },
   async getTasks() {
-    return Task.findAll();
+    return Task.findAll({
+      where: {
+        issueType: "Task",
+      },
+    });
   },
   async getTask(id) {
     return Task.findByPk(id);

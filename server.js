@@ -1,12 +1,15 @@
 const express = require("express");
 const server = express();
 const port = 4000;
+const cron = require("node-cron");
 
 require("dotenv").config();
 
 const cors = require("cors");
-const { Axios } = require("axios");
-const taskProvider = require("./providers/task.provider");
+
+const { fetchInitData } = require("./services/fetch-initial-data");
+const moment = require("moment");
+const { emailSender } = require("./services/email-sender");
 server.use(
   cors({
     origin: ["http://localhost:3000", "http://localhost:3001"],
@@ -21,55 +24,8 @@ server.listen(port, () => {
   fetchInitData();
 });
 
-async function fetchInitData() {
-  console.log("fetching data");
-
-  let tasks = await fetch(
-    "https://arova.atlassian.net/rest/api/2/search?jql=project%3D10006&fields=summary,issuetype,parent,created,priority,status,duedate,assignee&createdat=2024-02-13T09%3A43%3A09.078%2B0500&status",
-    {
-      method: "GET",
-      headers: {
-        Authorization:
-          "Basic " +
-          Buffer.from(
-            `${process.env.JIRA_USER}:${process.env.JIRA_TOKEN}`
-          ).toString("base64"),
-      },
-    }
-  );
-  tasks = await tasks.json();
-  // delete all tasks
-  await taskProvider.deleteAllTasks();
-  await Promise.all(
-    tasks.issues.map(async (task) => {
-      const taskData = {
-        id: task.id,
-        self: task.self,
-        key: task.key,
-        summary: task.fields?.summary,
-        status: task.fields.status.name,
-        priority: task.fields.priority.name,
-        issueType: task.fields.issuetype?.name,
-        assignee: task.fields.assignee?.displayName,
-        parentId: task.fields.parent?.id,
-        parentSummary: task.fields.parent?.fields?.summary,
-        created: task.fields.created,
-        dueDate: task.fields.duedate,
-      };
-
-      await taskProvider.createTask(taskData);
-      console.log("task created");
-    })
-  );
-}
-
 server.get("/api/v1/", async (req, res) => {
   res.send("Hello World!");
-});
-
-server.get("/tasks", async (req, res) => {
-  const tasks = await taskProvider.getTasks();
-  return res.json(tasks);
 });
 
 server.get("/", async (req, res) => {
@@ -79,3 +35,80 @@ server.get("/", async (req, res) => {
 // use prefix for all routes
 
 server.use("/tasks", require("./routes/task.route"));
+
+// cron schedule every  5 hours
+cron.schedule("0 0 */5 * * *", async () => {
+  await pendingTasks();
+});
+
+async function pendingTasks() {
+  console.log("sending email");
+  const tasks = await taskProvider.getTasks();
+  const today = moment().format("YYYY-MM-DD");
+  const dueTasks = tasks.filter((task) => {
+    return moment(task.dueDate).format("YYYY-MM-DD").before(today);
+  });
+
+  await emailSender({
+    email: "arushamhussain@icloud.com",
+    subject: "Pending Tasks",
+    message: `<html>
+  <head>
+    <title>gig-html</title>
+  </head>
+  <body>
+    <h1>Pending Tasks</h1>
+    <p>Hi Arusham,</p>
+    <div style="margin-top: 10px; padding: 10px; background-color: #f5f5f5; border-radius: 10px;">
+   ${tasks
+     ?.filter((task) => {
+       return moment(task.dueDate).format("YYYY-MM-DD").before(today);
+     })
+     .map((task) => {
+       return `<p>${task.summary} is due on ${moment(task.dueDate).format(
+         "DD MMMM YYYY"
+       )}</p>`;
+     })}
+  </div>
+  <div>
+  <h1>Tasks Pending</h1>
+  <div style="margin-top: 10px; padding: 10px; background-color: #f5f5f5; border-radius: 10px;">
+  ${tasks
+    ?.filter((task) => task.status === "To Do")
+    .map((task) => {
+      return `<p>${task.summary} is due on ${moment(task.dueDate).format(
+        "DD MMMM YYYY"
+      )}</p>`;
+    })}
+
+  </div>
+  
+
+
+    <div>
+      <button
+        style="
+          margin-top: 20px;
+          padding: 10px 20px 10px 20px;
+          width: fit-content;
+          background-color: #141414;
+          color: white;
+          border-radius: 5px;
+          border: none;
+          cursor: pointer;
+        "
+      >
+        <a
+          href="https://localhost:3000/dashboard"
+          style="text-decoration: none; color: white"
+          >View Tasks</a
+        >
+      </button>
+    </div>
+
+   
+  </body>
+</html>
+`,
+  });
+}

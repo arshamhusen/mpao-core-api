@@ -1,13 +1,21 @@
+const taskProvider = require("../providers/task.provider");
+const { fetchInitData } = require("../services/fetch-initial-data");
+
 var router = require("express").Router();
 
-router.post("/tasks", async (req, res) => {
-  const task = await req.context.taskProvider.createTask(req.body);
-  return res.status(201).json(task);
+router.get("/", async (req, res) => {
+  const tasks = await taskProvider.getTasks();
+  return res.json(tasks);
 });
 
-router.get("/", async (req, res) => {
-  const tasks = await req.context.taskProvider.getTasks();
+router.get("/all", async (req, res) => {
+  const tasks = await taskProvider.getAll();
   return res.json(tasks);
+});
+
+router.get("/refresh", async (req, res) => {
+  await fetchInitData();
+  res.send("Data refreshed");
 });
 
 module.exports = router;
