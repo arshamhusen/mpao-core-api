@@ -36,13 +36,13 @@ server.get("/", async (req, res) => {
 
 server.use("/tasks", require("./routes/task.route"));
 
-// cron schedule every  5 hours
-cron.schedule("0 0 */5 * * *", async () => {
+// cron schedule every 5 seconds
+cron.schedule("*/5 * * * * *", async () => {
   await pendingTasks();
 });
 
 async function pendingTasks() {
-  console.log("sending email");
+  c;
   const tasks = await taskProvider.getTasks();
   const today = moment().format("YYYY-MM-DD");
   const dueTasks = tasks.filter((task) => {
@@ -106,7 +106,16 @@ async function pendingTasks() {
       </button>
     </div>
 
-   
+    <div style="display: flex; position: absolute; bottom: 5px">
+      <table>
+        <td align="center" class="esd-block-text es-p35b">
+          <p>
+            Hivvaru Team&nbsp;© 2022 Alivelun Pvt Ltd, Inc. All Rights Reserved.
+          </p>
+          <p>Male', Male' City. +960 9993529, +960 7600662</p>
+        </td>
+      </table>
+    </div>
   </body>
 </html>
 `,
